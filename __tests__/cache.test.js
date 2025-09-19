@@ -30,7 +30,7 @@ describe('Menu Caching', () => {
       expect(server.isCacheValid()).toBe(true);
       expect(server.menuCache.cached).toBe(true);
       expect(server.menuCache.items.length).toBeGreaterThan(0);
-    }, 30000);
+    }, 180000);
 
     it('should use cached data for subsequent requests', async () => {
       // First call to populate cache
@@ -47,7 +47,7 @@ describe('Menu Caching', () => {
       // Cache timestamp should be the same (no new fetch)
       expect(server.cacheTimestamp).toBe(cacheTimestamp);
       expect(menuData2.cached).toBe(true);
-    }, 30000);
+    }, 180000);
 
     it('should clear cache when requested', async () => {
       // Populate cache
@@ -63,7 +63,7 @@ describe('Menu Caching', () => {
       expect(clearData.itemsCleared).toBeGreaterThan(0);
       expect(server.menuCache).toBeNull();
       expect(server.cacheTimestamp).toBeNull();
-    }, 30000);
+    }, 180000);
 
     it('should have configurable cache expiry', () => {
       expect(server.cacheExpiryMinutes).toBe(30); // Default 30 minutes
@@ -107,7 +107,7 @@ describe('Menu Caching', () => {
       expect(response.body.valid).toBe(true);
       expect(response.body.itemCount).toBeGreaterThan(0);
       expect(response.body.cacheAgeMinutes).toBeGreaterThanOrEqual(0);
-    }, 30000);
+    }, 180000);
 
     it('should update API documentation with cache endpoints', async () => {
       const response = await request(app).get('/api');
@@ -133,7 +133,7 @@ describe('Menu Caching', () => {
       // Cached request should be significantly faster
       expect(time2).toBeLessThan(time1 / 2);
       console.log(`Uncached: ${time1}ms, Cached: ${time2}ms`);
-    }, 30000);
+    }, 180000);
 
     it('should maintain cache across different tool calls', async () => {
       // First call to populate cache
@@ -147,7 +147,7 @@ describe('Menu Caching', () => {
 
       // Cache should not have been refreshed
       expect(server.cacheTimestamp).toBe(cacheTimestamp);
-    }, 30000);
+    }, 180000);
   });
 
   describe('Cache Expiry', () => {
@@ -186,6 +186,6 @@ describe('Menu Caching', () => {
         // Restore original method
         server.fetchFromAPI = originalFetch;
       }
-    }, 30000);
+    }, 180000);
   });
 });

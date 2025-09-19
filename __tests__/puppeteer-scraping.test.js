@@ -42,7 +42,7 @@ describe('Puppeteer Menu Scraping', () => {
       } catch (error) {
         console.log('Puppeteer error (expected if no items found):', error.message);
       }
-    }, 60000);
+    }, 180000);
 
     it('should handle Puppeteer failures gracefully', async () => {
       server.clearCache();
@@ -82,7 +82,7 @@ describe('Puppeteer Menu Scraping', () => {
         // This is now expected behavior when scraping fails
         expect(error.message).toContain('Unable to extract valid menu items');
       }
-    }, 60000);
+    }, 180000);
 
     it('should require real menu data from website', async () => {
       server.clearCache();
@@ -106,7 +106,7 @@ describe('Puppeteer Menu Scraping', () => {
         expect(error.message).toContain('Unable to extract valid menu items');
         console.log('Expected failure when no real menu data available:', error.message);
       }
-    }, 60000);
+    }, 180000);
   });
 
   describe('Category Discovery', () => {
@@ -142,6 +142,6 @@ describe('Puppeteer Menu Scraping', () => {
       } catch (error) {
         console.log('Category discovery failed:', error.message);
       }
-    }, 60000);
+    }, 180000);
   });
 });

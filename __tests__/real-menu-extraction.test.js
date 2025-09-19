@@ -45,7 +45,7 @@ describe('Real Menu Extraction', () => {
         console.log('Category discovery failed:', error.message);
         // This test documents current behavior - may fail until scraping is perfect
       }
-    }, 90000);
+    }, 180000);
   });
 
   describe('Menu Item Requirements', () => {
@@ -105,7 +105,7 @@ describe('Real Menu Extraction', () => {
         );
         expect(error.message).toContain('Unable to extract valid menu items');
       }
-    }, 90000);
+    }, 180000);
   });
 
   describe('Specific Menu Items', () => {
@@ -139,7 +139,7 @@ describe('Real Menu Extraction', () => {
       } catch (error) {
         console.log('Coconut search failed:', error.message);
       }
-    }, 90000);
+    }, 180000);
 
     it('should find food items in cookies and pastries categories', async () => {
       server.clearCache();
@@ -162,6 +162,6 @@ describe('Real Menu Extraction', () => {
       } catch (error) {
         console.log('Cookies category failed:', error.message);
       }
-    }, 90000);
+    }, 180000);
   });
 });

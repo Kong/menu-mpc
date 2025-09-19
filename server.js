@@ -30,7 +30,7 @@ class ForFiveCoffeeServer {
     // Menu caching
     this.menuCache = null;
     this.cacheTimestamp = null;
-    this.cacheExpiryMinutes = 30; // Cache for 30 minutes
+    this.cacheExpiryMinutes = 24 * 60; // Cache for 24 hours (1440 minutes)
 
     this.setupToolHandlers();
     this.setupHttpServer();
@@ -331,9 +331,8 @@ class ForFiveCoffeeServer {
       cacheTimestamp: new Date().toISOString(),
     };
     this.cacheTimestamp = new Date();
-    console.log(
-      `Menu cached with ${menuData.items.length} items, expires in ${this.cacheExpiryMinutes} minutes`
-    );
+    const hours = Math.round(this.cacheExpiryMinutes / 60);
+    console.log(`Menu cached with ${menuData.items.length} items, expires in ${hours} hours`);
   }
 
   clearCache() {
@@ -441,24 +440,53 @@ class ForFiveCoffeeServer {
       console.log('Starting headless browser...');
       browser = await puppeteer.launch({
         headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage',
+          '--disable-accelerated-2d-canvas',
+          '--no-first-run',
+          '--no-zygote',
+          '--disable-gpu',
+          '--disable-web-security',
+          '--disable-features=VizDisplayCompositor',
+        ],
         timeout: 30000,
       });
 
       const page = await browser.newPage();
+
+      // Optimize page for faster loading
+      await page.setRequestInterception(true);
+      page.on('request', req => {
+        // Block unnecessary resources to speed up loading
+        if (
+          req.resourceType() === 'image' ||
+          req.resourceType() === 'stylesheet' ||
+          req.resourceType() === 'font' ||
+          req.url().includes('google-analytics') ||
+          req.url().includes('facebook') ||
+          req.url().includes('twitter')
+        ) {
+          req.abort();
+        } else {
+          req.continue();
+        }
+      });
+
       await page.setUserAgent(
         'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
       );
 
       console.log('Loading For Five Coffee menu page...');
       await page.goto('https://for-five-coffee.ordrsliponline.com/menus', {
-        waitUntil: 'networkidle2',
+        waitUntil: 'domcontentloaded', // Faster than networkidle2
         timeout: 30000,
       });
 
-      // Wait for React to render the menu content
+      // Wait for React to render the menu content (optimized)
       console.log('Waiting for menu content to load...');
-      await new Promise(resolve => setTimeout(resolve, 3000));
+      await new Promise(resolve => setTimeout(resolve, 1500));
 
       // Try to wait for menu sections to appear
       try {
@@ -479,20 +507,19 @@ class ForFiveCoffeeServer {
 
       console.log('Found categories:', categories);
 
+      // Click on each category and extract items with optimized timing
       const allItems = [];
 
-      // Click on each category and extract items
       for (const category of categories) {
         try {
           console.log(`Extracting items from category: ${category}`);
 
-          // Click on the category and wait for content
+          // Click on the category
           const clicked = await page.evaluate(categoryName => {
             /* eslint-disable no-undef */
             const categoryElements = document.querySelectorAll('.cat-items');
             for (const el of categoryElements) {
               if (el.textContent.trim() === categoryName) {
-                console.log(`Clicking on category: ${categoryName}`);
                 el.click();
                 return true;
               }
@@ -505,23 +532,49 @@ class ForFiveCoffeeServer {
             continue;
           }
 
-          // Wait longer for items to load and DOM to update
-          await new Promise(resolve => setTimeout(resolve, 3000));
+          // Wait for items to load with adaptive timing
+          await new Promise(resolve => setTimeout(resolve, 1000));
+
+          // Try to detect when items are loaded instead of fixed wait
+          try {
+            await page.waitForFunction(
+              _catName => {
+                /* eslint-disable no-undef */
+                const elements = document.querySelectorAll('div');
+                let priceCount = 0;
+                elements.forEach(el => {
+                  const text = el.textContent || '';
+                  if (
+                    text.includes('$') &&
+                    !text.includes('$0.00') &&
+                    !el.classList.contains('cat-items')
+                  ) {
+                    priceCount++;
+                  }
+                });
+                return priceCount >= 3; // Wait until we see at least 3 prices
+              },
+              { timeout: 3000 },
+              category
+            );
+          } catch (_e) {
+            // If detection fails, use shorter fixed wait
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
 
           // Extract items from this category
           const categoryItems = await page.evaluate(categoryName => {
             /* eslint-disable no-undef */
             const items = [];
 
-            // Look for menu items that match the structure from the screenshot
-            // Items appear to be in card/grid layout with name, optional description, and price
+            // Look for menu items in the current view
             const allDivs = document.querySelectorAll('div');
             const menuItemCandidates = [];
 
             allDivs.forEach(div => {
               const text = div.textContent?.trim() || '';
 
-              // Look for divs that contain a price and reasonable amount of text
+              // Look for elements with prices
               if (
                 text.includes('$') &&
                 text.length > 5 &&
@@ -530,14 +583,10 @@ class ForFiveCoffeeServer {
                 !div.classList.contains('navbar') &&
                 !text.includes('$0.00')
               ) {
-                // Check for price patterns - allow price ranges like $5.75 - $7.75
                 const priceMatches = text.match(/\$\d+\.\d{2}/g);
                 if (priceMatches && priceMatches.length >= 1) {
-                  // Use first price if multiple (for ranges like $5.75 - $7.75)
                   menuItemCandidates.push({
-                    element: div,
                     text: text,
-                    price: priceMatches[0],
                     priceRange:
                       priceMatches.length > 1
                         ? `${priceMatches[0]} - ${priceMatches[priceMatches.length - 1]}`
@@ -547,40 +596,24 @@ class ForFiveCoffeeServer {
               }
             });
 
-            console.log(
-              `Found ${menuItemCandidates.length} menu item candidates for ${categoryName}`
-            );
-
-            // Debug: show what we found
-            menuItemCandidates.slice(0, 3).forEach((candidate, i) => {
-              console.log(
-                `Candidate ${i + 1}: ${candidate.text.substring(0, 80)}... (${candidate.price})`
-              );
-            });
-
-            // Extract items from candidates
-            menuItemCandidates.forEach((candidate, _index) => {
+            // Process candidates for this category
+            menuItemCandidates.forEach(candidate => {
               const text = candidate.text;
-              const price = candidate.priceRange; // Use full price range for items with multiple sizes
+              const price = candidate.priceRange;
 
-              // Clean the text and extract name/description
-              const cleanText = text.replace(/\$\d+\.\d{2}(\s*-\s*\$\d+\.\d{2})?/g, '').trim(); // Remove price ranges
+              // Clean text and extract name
+              const cleanText = text.replace(/\$\d+\.\d{2}(\s*-\s*\$\d+\.\d{2})?/g, '').trim();
               const lines = cleanText
                 .split('\n')
                 .map(l => l.trim())
                 .filter(l => l.length > 0 && l.length < 100);
 
               if (lines.length > 0) {
-                // First non-empty line should be the item name
                 let name = lines[0];
-
-                // Clean up common prefixes/suffixes
                 name = name.replace(/^(Add to cart|Remove|Quantity:?\s*\d*)/, '').trim();
 
                 if (name.length > 2 && name.length < 80) {
                   const description = lines.slice(1).join(' ').substring(0, 200);
-
-                  console.log(`Extracted: "${name}" - ${price} from: ${text.substring(0, 60)}...`);
 
                   items.push({
                     name: name,
@@ -602,7 +635,7 @@ class ForFiveCoffeeServer {
         }
       }
 
-      // Remove duplicates based on name only (since same item can have different sizes/prices)
+      // Remove duplicates based on name and category
       const uniqueItems = [];
       const seen = new Set();
 

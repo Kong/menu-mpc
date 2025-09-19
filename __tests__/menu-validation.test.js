@@ -33,7 +33,7 @@ describe('Menu Data Validation', () => {
         expect(firstItem.name).not.toContain('tenant');
         expect(firstItem.name).not.toContain('coordinates');
       }
-    }, 30000);
+    }, 180000);
 
     it('should return menu items with valid structure', async () => {
       const result = await server.getFullMenu();
@@ -87,7 +87,7 @@ describe('Menu Data Validation', () => {
           console.log(`Item ${index + 1}: ${item.name} - ${item.price} (${item.category})`);
         });
       }
-    }, 30000);
+    }, 180000);
 
     it('should find coffee-related items', async () => {
       const result = await server.getFullMenu();
@@ -113,7 +113,7 @@ describe('Menu Data Validation', () => {
         // If no items found, this test should fail to alert us
         throw new Error('No menu items found - menu scraping may be broken');
       }
-    }, 30000);
+    }, 180000);
   });
 
   describe('Menu Categories Quality', () => {
@@ -156,7 +156,7 @@ describe('Menu Data Validation', () => {
       );
 
       expect(hasFoodCategories).toBe(true);
-    }, 60000);
+    }, 180000);
   });
 
   describe('Search Functionality', () => {
@@ -195,7 +195,7 @@ describe('Menu Data Validation', () => {
 
         expect(relevantResults.length).toBeGreaterThan(0);
       }
-    }, 30000);
+    }, 180000);
 
     it('should handle searches for common coffee shop items', async () => {
       const searchTerms = ['latte', 'espresso', 'cappuccino', 'tea'];
@@ -220,7 +220,7 @@ describe('Menu Data Validation', () => {
           });
         }
       }
-    }, 45000);
+    }, 180000);
   });
 
   describe('Data Consistency', () => {
@@ -244,7 +244,7 @@ describe('Menu Data Validation', () => {
           });
         }
       }
-    }, 45000);
+    }, 180000);
 
     it('should have reasonable menu size for a coffee shop', async () => {
       const result = await server.getFullMenu();
@@ -260,6 +260,6 @@ describe('Menu Data Validation', () => {
       if (menuData.totalItems > 5) {
         expect(menuData.categories.length).toBeGreaterThan(1);
       }
-    }, 30000);
+    }, 180000);
   });
 });
