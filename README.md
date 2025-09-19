@@ -1,8 +1,8 @@
-# For Five Coffee MCP Server
-
-[![CI](https://github.com/user/menu-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/user/menu-mcp/actions/workflows/ci.yml)
+[![CI](https://github.com/Kong/menu-mpc/actions/workflows/ci.yml/badge.svg)](https://github.com/Kong/menu-mpc/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
+
+# For Five Coffee MCP Server
 
 A Model Context Protocol (MCP) server that provides access to [For Five Coffee](https://for-five-coffee.ordrsliponline.com/menus) menu data. Works with Claude Desktop, Cursor, and other MCP clients, plus provides a REST API.
 
