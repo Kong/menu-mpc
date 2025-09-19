@@ -4,420 +4,164 @@
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
 
-A Model Context Protocol (MCP) server that exposes menu items from [For Five Coffee](https://for-five-coffee.ordrsliponline.com/menus). This server allows AI assistants to fetch, search, and organize menu information from the café.
+A Model Context Protocol (MCP) server that provides access to [For Five Coffee](https://for-five-coffee.ordrsliponline.com/menus) menu data. Works with Claude Desktop, Cursor, and other MCP clients, plus provides a REST API.
 
-## Features
-
-- **Dual Mode Operation**: Runs both MCP (stdio) and HTTP API server simultaneously
-- **Full Menu Access**: Retrieve the complete menu with all categories and items
-- **Smart Search**: Search for menu items by name, description, or category
-- **Category Filtering**: Get items from specific menu categories
-- **Category Listing**: View all available menu categories
-- **REST API**: Full HTTP REST API with CORS support for web applications
-- **Robust Scraping**: Multiple fallback methods to extract menu data from the website
-- **Production Ready**: Comprehensive testing, linting, and CI/CD pipeline
-
-## Installation
-
-1. Clone or download this repository
-2. Install dependencies:
-   ```bash
-   npm install
-   ```
-
-## Usage
-
-### Running the Server
-
-The server runs both MCP (stdio) and HTTP modes simultaneously:
+## Quick Start
 
 ```bash
+git clone <this-repo>
+cd menu-mcp
+npm install
 npm start
 ```
 
-This will start:
-- **MCP Server**: Running on stdio for AI assistant integration
-- **HTTP API Server**: Running on port 3000 (or PORT environment variable)
+This starts both:
+- **MCP Server** (stdio) - for AI assistants
+- **HTTP API** (port 3000) - for web apps
 
-Or for development with auto-restart:
-```bash
-npm run dev
-```
-
-### HTTP API Endpoints
-
-When running, the server provides a REST API accessible at `http://localhost:3000`:
-
-- **GET /** - Server information and API overview
-- **GET /health** - Health check endpoint
-- **GET /api** - API documentation with examples
-- **GET /api/menu** - Get the complete menu
-- **GET /api/menu/categories** - Get all menu categories
-- **GET /api/menu/category/{category}** - Get items from a specific category
-- **GET /api/menu/search?q={query}** - Search menu items
-
-### Example HTTP Requests
-
-```bash
-# Get server info
-curl http://localhost:3000/
-
-# Health check
-curl http://localhost:3000/health
-
-# Get full menu
-curl http://localhost:3000/api/menu
-
-# Get categories
-curl http://localhost:3000/api/menu/categories
-
-# Search for coffee items
-curl "http://localhost:3000/api/menu/search?q=coffee"
-
-# Get items from Coffee category
-curl http://localhost:3000/api/menu/category/Coffee
-```
-
-### Integration with MCP Clients
-
-#### Claude Desktop
-
-Add the following to your `claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "for-five-coffee": {
-      "command": "node",
-      "args": ["/path/to/your/menu-mcp/server.js"]
-    }
-  }
-}
-```
-
-#### Cursor
-
-Add to your Cursor MCP configuration:
-
-```json
-{
-  "mcpServers": {
-    "for-five-coffee": {
-      "command": "node",
-      "args": ["/path/to/your/menu-mcp/server.js"]
-    }
-  }
-}
-```
-
-## Available Tools
-
-### 1. `get_full_menu`
-Fetches the complete menu from For Five Coffee including all categories and items.
-
-**Parameters**: None
-
-**Example Response**:
-```json
-{
-  "restaurant": "For Five Coffee",
-  "totalItems": 25,
-  "categories": ["Coffee", "Tea", "Pastries", "Sandwiches"],
-  "items": [
-    {
-      "name": "Espresso",
-      "description": "Rich and bold espresso shot",
-      "price": "$3.50",
-      "category": "Coffee"
-    }
-  ],
-  "lastUpdated": "2025-09-19T10:30:00.000Z"
-}
-```
-
-### 2. `search_menu_items`
-Search for specific menu items by name, description, or category.
-
-**Parameters**:
-- `query` (string, required): Search term to find in menu items
-
-**Example Usage**:
-```json
-{
-  "name": "search_menu_items",
-  "arguments": {
-    "query": "latte"
-  }
-}
-```
-
-### 3. `get_menu_categories`
-Get all available menu categories.
-
-**Parameters**: None
-
-**Example Response**:
-```json
-{
-  "categories": ["Coffee", "Tea", "Pastries", "Sandwiches"],
-  "totalCategories": 4
-}
-```
-
-### 4. `get_items_by_category`
-Get all menu items from a specific category.
-
-**Parameters**:
-- `category` (string, required): The category name to filter by
-
-**Example Usage**:
-```json
-{
-  "name": "get_items_by_category",
-  "arguments": {
-    "category": "Coffee"
-  }
-}
-```
-
-## Example MCP Tool Calls
-
-### Get Full Menu
-
-**Request:**
-```json
-{
-  "method": "tools/call",
-  "params": {
-    "name": "get_full_menu",
-    "arguments": {}
-  }
-}
-```
-
-**Response:**
-```json
-{
-  "content": [
-    {
-      "type": "text",
-      "text": "{
-        \"restaurant\": \"For Five Coffee\",
-        \"totalItems\": 15,
-        \"categories\": [\"Coffee\", \"Tea\", \"Pastries\"],
-        \"items\": [
-          {
-            \"name\": \"Cappuccino\",
-            \"description\": \"Rich espresso with steamed milk foam\",
-            \"price\": \"$4.50\",
-            \"category\": \"Coffee\"
-          }
-        ],
-        \"lastUpdated\": \"2025-09-19T01:15:00.000Z\"
-      }"
-    }
-  ]
-}
-```
-
-### Search Menu Items
-
-**Request:**
-```json
-{
-  "method": "tools/call",
-  "params": {
-    "name": "search_menu_items",
-    "arguments": {
-      "query": "latte"
-    }
-  }
-}
-```
-
-**Response:**
-```json
-{
-  "content": [
-    {
-      "type": "text",
-      "text": "{
-        \"query\": \"latte\",
-        \"resultsFound\": 3,
-        \"items\": [
-          {
-            \"name\": \"Vanilla Latte\",
-            \"description\": \"Espresso with steamed milk and vanilla syrup\",
-            \"price\": \"$5.00\",
-            \"category\": \"Coffee\"
-          }
-        ]
-      }"
-    }
-  ]
-}
-```
-
-## AI Assistant Integration Examples
+## MCP Client Setup
 
 ### Claude Desktop
 
-After configuring the MCP server, you can ask Claude:
-- "What coffee drinks does For Five Coffee have?"
-- "Search for pastries on the menu"
-- "Show me all the tea options"
-- "What categories are available on the menu?"
+Add to `claude_desktop_config.json`:
+
+```json
+{
+  "mcpServers": {
+    "for-five-coffee": {
+      "command": "node",
+      "args": ["/path/to/menu-mcp/server.js"]
+    }
+  }
+}
+```
 
 ### Cursor
 
-Similar configuration in Cursor's MCP settings allows you to:
-- Get menu information while coding a food ordering app
-- Reference actual menu items in documentation
-- Use real menu data for testing purposes
+**Option 1: Let Cursor start the server**
+Add to `~/.cursor/mcp.json`:
 
-## Tips for Usage
+```json
+{
+  "mcpServers": {
+    "for-five-coffee": {
+      "command": "node",
+      "args": ["/Users/marco/git/menu-mcp/server.js"],
+      "env": {
+        "PORT": "3000"
+      }
+    }
+  }
+}
+```
 
-1. **Broad Searches**: Use general terms like "coffee", "sweet", or "hot" to find related items
-2. **Category Filtering**: Get the categories first, then filter by specific ones
-3. **Price Comparison**: The full menu shows all prices for easy comparison
-4. **Real-time Data**: The server fetches fresh data from the website each time
+**Option 2: Connect to already running server**
+If you're running `npm start` separately, add this to `~/.cursor/mcp.json`:
 
-## Technical Details
+```json
+{
+  "mcpServers": {
+    "for-five-coffee": {
+      "url": "http://localhost:3000/sse"
+    }
+  }
+}
+```
 
-### Web Scraping Strategy
+This connects Cursor to the running MCP server via Server-Sent Events (SSE).
 
-The server uses a robust multi-layered approach to extract menu data:
+## Usage Examples
 
-1. **Primary Selectors**: Tries common CSS selectors for menu items
-2. **Fallback Parsing**: If structured data isn't found, parses plain text content
-3. **Smart Extraction**: Uses multiple selector patterns to find names, descriptions, and prices
-4. **Category Detection**: Attempts to identify menu categories from page structure
+### Ask Your AI Assistant
 
-### Error Handling
+- "What coffee drinks does For Five Coffee have?"
+- "Search for pastries on the menu"
+- "What's the cheapest coffee option?"
+- "Show me all tea varieties"
 
-- Network timeouts (10 second limit)
-- Graceful fallbacks when menu structure changes
-- Detailed error messages for debugging
-- Automatic retry logic for transient failures
+### Use the HTTP API
 
-### Data Structure
+```bash
+# Get full menu
+curl http://localhost:3000/api/menu
 
-Each menu item contains:
-- `name`: The item name
-- `description`: Item description (if available)
-- `price`: Price information
-- `category`: Menu category (detected or defaults to "General")
+# Search for items
+curl "http://localhost:3000/api/menu/search?q=latte"
+
+# Get categories
+curl http://localhost:3000/api/menu/categories
+```
+
+### In Your Code
+
+```javascript
+// Fetch menu data
+const response = await fetch('http://localhost:3000/api/menu');
+const menu = await response.json();
+
+// Search items
+const search = await fetch('http://localhost:3000/api/menu/search?q=coffee');
+const results = await search.json();
+```
+
+```python
+import requests
+
+# Get menu
+menu = requests.get('http://localhost:3000/api/menu').json()
+
+# Search
+results = requests.get('http://localhost:3000/api/menu/search', 
+                      params={'q': 'latte'}).json()
+```
+
+## Available Endpoints
+
+| Endpoint | Description |
+|----------|-------------|
+| `GET /` | Server info |
+| `GET /health` | Health check |
+| `GET /api/menu` | Full menu |
+| `GET /api/menu/search?q={query}` | Search items |
+| `GET /api/menu/categories` | All categories |
+| `GET /api/menu/category/{name}` | Items by category |
+
+## MCP Tools
+
+- `get_full_menu` - Get complete menu
+- `search_menu_items` - Search by query
+- `get_menu_categories` - List categories
+- `get_items_by_category` - Filter by category
 
 ## Development
 
-### Project Structure
-
-```
-menu-mcp/
-├── server.js                    # Main MCP server implementation
-├── package.json                 # Project dependencies and scripts
-├── LICENSE                      # Apache 2.0 license
-├── README.md                    # This documentation
-├── eslint.config.js             # ESLint configuration
-├── .prettierrc                  # Prettier configuration
-├── .gitignore                   # Git ignore patterns
-├── __tests__/
-│   ├── server.test.js           # Unit tests
-│   └── integration.test.js      # Integration tests
-├── .github/
-│   └── workflows/
-│       └── ci.yml               # GitHub Actions CI/CD
-└── claude_desktop_config.example.json  # Example MCP client config
-```
-
-### Dependencies
-
-**Production:**
-- `@modelcontextprotocol/sdk`: Official MCP SDK (latest)
-- `axios`: HTTP client for web requests (latest)
-- `cheerio`: Server-side HTML parsing and manipulation (latest)
-- `express`: Web framework for HTTP API (latest)
-- `cors`: CORS middleware for cross-origin requests (latest)
-
-**Development:**
-- `eslint`: Code linting
-- `prettier`: Code formatting
-- `jest`: Testing framework
-- `supertest`: HTTP assertion library
-
-### Scripts
-
 ```bash
-npm start          # Start both MCP and HTTP servers
-npm run dev        # Start with auto-restart
-npm test           # Run all tests
-npm run test:unit  # Run unit tests only
-npm run test:integration # Run integration tests only
-npm run test:http  # Run HTTP server tests only
-npm run test:watch # Run tests in watch mode
-npm run lint       # Check code style
-npm run lint:fix   # Fix code style issues
-npm run format     # Format code with Prettier
-npm run validate   # Validate server syntax
+npm run dev          # Start with auto-restart
+npm test             # Run all tests
+npm run test:unit    # Unit tests only
+npm run test:http    # HTTP API tests only  
+npm run test:sse     # SSE MCP transport tests only
+npm run test:integration # Integration tests only
+npm run lint         # Check code style
 ```
-
-### Testing
-
-The project includes comprehensive testing:
-
-- **Unit Tests**: Test individual components and functions
-- **Integration Tests**: Test actual menu fetching from the website
-- **CI/CD Pipeline**: Automated testing on multiple Node.js versions
-
-Run tests:
-```bash
-npm test
-```
-
-Run integration tests only:
-```bash
-npm test -- --testPathPattern="integration.test.js"
-```
-
-### Code Quality
-
-The project uses ESLint and Prettier for consistent code style:
-
-```bash
-npm run lint        # Check for style issues
-npm run lint:fix    # Automatically fix issues
-npm run format      # Format all code
-```
-
-### Extending the Server
-
-To add new functionality:
-
-1. Add a new tool definition in the `ListToolsRequestSchema` handler
-2. Implement the tool logic in the `CallToolRequestSchema` handler
-3. Add any new helper methods to the `ForFiveCoffeeServer` class
-4. Write tests for the new functionality
-5. Update documentation
 
 ## Troubleshooting
 
-### Common Issues
+**MCP not working?**
+- Check the absolute path to `server.js` in your config
+- Restart your MCP client after config changes
+- Run `npm start` manually to test
 
-1. **"Failed to fetch menu data"**: Check internet connection and verify the For Five Coffee website is accessible
-2. **"No menu items found"**: The website structure may have changed - the scraper includes fallback methods
-3. **"Tool not found"**: Ensure the MCP client is properly configured and the server is running
+**HTTP API not responding?**
+- Make sure server is running: `npm start`
+- Check port 3000 isn't in use: `lsof -i :3000`
+- Test: `curl http://localhost:3000/health`
 
-### Debugging
-
-Run the server with additional logging:
-```bash
-DEBUG=* npm start
-```
+**No menu data?**
+- Check internet connection
+- The server handles SSL issues automatically
+- Website structure may have changed (fallbacks included)
 
 ## License
 
-MIT License - feel free to modify and distribute as needed.
-
-## Contributing
-
-Contributions are welcome! Please feel free to submit pull requests or open issues for bugs and feature requests.
+Apache 2.0
