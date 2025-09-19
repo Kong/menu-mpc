@@ -557,7 +557,7 @@ class ForFiveCoffeeServer {
               { timeout: 3000 },
               category
             );
-          } catch (_e) {
+          } catch {
             // If detection fails, use shorter fixed wait
             await new Promise(resolve => setTimeout(resolve, 500));
           }
