@@ -11,6 +11,7 @@
     "test": "NODE_OPTIONS='--experimental-vm-modules' jest",
     "test:unit": "NODE_OPTIONS='--experimental-vm-modules' jest --testPathPattern='server.test.js'",
     "test:integration": "NODE_OPTIONS='--experimental-vm-modules' jest --testPathPattern='integration.test.js'",
+    "test:http": "NODE_OPTIONS='--experimental-vm-modules' jest --testPathPattern='http-server.test.js'",
     "test:watch": "NODE_OPTIONS='--experimental-vm-modules' jest --watch",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -28,7 +29,9 @@
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.0.0",
     "axios": "^1.7.0",
-    "cheerio": "^1.0.0"
+    "cheerio": "^1.0.0",
+    "cors": "^2.8.5",
+    "express": "^4.18.0"
   },
   "devDependencies": {
     "@eslint/js": "^9.0.0",
@@ -41,9 +44,5 @@
   },
   "engines": {
     "node": ">=18.0.0"
-  },
-  "jest": {
-    "testEnvironment": "node",
-    "transform": {}
   }
 }

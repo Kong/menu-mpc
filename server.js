@@ -5,6 +5,8 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
+import express from 'express';
+import cors from 'cors';
 
 class ForFiveCoffeeServer {
   constructor() {
@@ -20,7 +22,11 @@ class ForFiveCoffeeServer {
       }
     );
 
+    this.app = express();
+    this.port = process.env.PORT || 3000;
+
     this.setupToolHandlers();
+    this.setupHttpServer();
     this.setupErrorHandling();
   }
 
@@ -104,12 +110,108 @@ class ForFiveCoffeeServer {
     });
   }
 
+  setupHttpServer() {
+    // Middleware
+    this.app.use(cors());
+    this.app.use(express.json());
+
+    // Health check endpoint
+    this.app.get('/health', (req, res) => {
+      res.json({
+        status: 'ok',
+        service: 'for-five-coffee-mcp-server',
+        version: '1.0.0',
+        timestamp: new Date().toISOString(),
+      });
+    });
+
+    // Get full menu endpoint
+    this.app.get('/api/menu', async (req, res) => {
+      try {
+        const result = await this.getFullMenu();
+        const menuData = JSON.parse(result.content[0].text);
+        res.json(menuData);
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Search menu items endpoint
+    this.app.get('/api/menu/search', async (req, res) => {
+      try {
+        const { q: query } = req.query;
+        if (!query) {
+          return res.status(400).json({ error: 'Query parameter "q" is required' });
+        }
+
+        const result = await this.searchMenuItems(query);
+        const searchData = JSON.parse(result.content[0].text);
+        res.json(searchData);
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Get menu categories endpoint
+    this.app.get('/api/menu/categories', async (req, res) => {
+      try {
+        const result = await this.getMenuCategories();
+        const categoriesData = JSON.parse(result.content[0].text);
+        res.json(categoriesData);
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // Get items by category endpoint
+    this.app.get('/api/menu/category/:category', async (req, res) => {
+      try {
+        const { category } = req.params;
+        const result = await this.getItemsByCategory(category);
+        const categoryData = JSON.parse(result.content[0].text);
+        res.json(categoryData);
+      } catch (error) {
+        res.status(500).json({ error: error.message });
+      }
+    });
+
+    // API documentation endpoint
+    this.app.get('/api', (req, res) => {
+      res.json({
+        name: 'For Five Coffee MCP Server API',
+        version: '1.0.0',
+        description: 'REST API for For Five Coffee menu data',
+        endpoints: {
+          'GET /health': 'Health check',
+          'GET /api': 'API documentation',
+          'GET /api/menu': 'Get full menu',
+          'GET /api/menu/search?q={query}': 'Search menu items',
+          'GET /api/menu/categories': 'Get all categories',
+          'GET /api/menu/category/{category}': 'Get items by category',
+        },
+        examples: {
+          fullMenu: `${req.protocol}://${req.get('host')}/api/menu`,
+          search: `${req.protocol}://${req.get('host')}/api/menu/search?q=latte`,
+          categories: `${req.protocol}://${req.get('host')}/api/menu/categories`,
+          category: `${req.protocol}://${req.get('host')}/api/menu/category/Coffee`,
+        },
+      });
+    });
+
+    // Root endpoint
+    this.app.get('/', (req, res) => {
+      res.json({
+        message: 'For Five Coffee MCP Server',
+        version: '1.0.0',
+        mcp: 'Model Context Protocol server running on stdio',
+        http: `HTTP API available at ${req.protocol}://${req.get('host')}/api`,
+        health: `${req.protocol}://${req.get('host')}/health`,
+      });
+    });
+  }
+
   setupErrorHandling() {
     this.server.onerror = error => console.error('[MCP Error]', error);
-    process.on('SIGINT', async () => {
-      await this.server.close();
-      process.exit(0);
-    });
   }
 
   async fetchMenuData() {
@@ -368,11 +470,35 @@ class ForFiveCoffeeServer {
   }
 
   async run() {
+    // Start HTTP server
+    const httpServer = this.app.listen(this.port, () => {
+      console.error(`HTTP API server listening on port ${this.port}`);
+      console.error(`Visit http://localhost:${this.port} for API documentation`);
+    });
+
+    // Start MCP server on stdio
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
-    console.error('For Five Coffee MCP Server running on stdio');
+    console.error('MCP server running on stdio');
+
+    // Handle graceful shutdown
+    const shutdown = async () => {
+      console.error('Shutting down servers...');
+      httpServer.close();
+      await this.server.close();
+      process.exit(0);
+    };
+
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
   }
 }
 
-const server = new ForFiveCoffeeServer();
-server.run().catch(console.error);
+// Export the class for testing and alternative usage
+export { ForFiveCoffeeServer };
+
+// Run the server if this file is executed directly
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const server = new ForFiveCoffeeServer();
+  server.run().catch(console.error);
+}

@@ -109,3 +109,6 @@ dist
 # Logs
 logs
 *.log
+
+# Keep jest setup file (don't ignore)
+!jest.setup.js

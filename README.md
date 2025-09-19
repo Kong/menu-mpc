@@ -8,10 +8,12 @@ A Model Context Protocol (MCP) server that exposes menu items from [For Five Cof
 
 ## Features
 
+- **Dual Mode Operation**: Runs both MCP (stdio) and HTTP API server simultaneously
 - **Full Menu Access**: Retrieve the complete menu with all categories and items
 - **Smart Search**: Search for menu items by name, description, or category
 - **Category Filtering**: Get items from specific menu categories
 - **Category Listing**: View all available menu categories
+- **REST API**: Full HTTP REST API with CORS support for web applications
 - **Robust Scraping**: Multiple fallback methods to extract menu data from the website
 - **Production Ready**: Comprehensive testing, linting, and CI/CD pipeline
 
@@ -27,13 +29,53 @@ A Model Context Protocol (MCP) server that exposes menu items from [For Five Cof
 
 ### Running the Server
 
+The server runs both MCP (stdio) and HTTP modes simultaneously:
+
 ```bash
 npm start
 ```
 
+This will start:
+- **MCP Server**: Running on stdio for AI assistant integration
+- **HTTP API Server**: Running on port 3000 (or PORT environment variable)
+
 Or for development with auto-restart:
 ```bash
 npm run dev
+```
+
+### HTTP API Endpoints
+
+When running, the server provides a REST API accessible at `http://localhost:3000`:
+
+- **GET /** - Server information and API overview
+- **GET /health** - Health check endpoint
+- **GET /api** - API documentation with examples
+- **GET /api/menu** - Get the complete menu
+- **GET /api/menu/categories** - Get all menu categories
+- **GET /api/menu/category/{category}** - Get items from a specific category
+- **GET /api/menu/search?q={query}** - Search menu items
+
+### Example HTTP Requests
+
+```bash
+# Get server info
+curl http://localhost:3000/
+
+# Health check
+curl http://localhost:3000/health
+
+# Get full menu
+curl http://localhost:3000/api/menu
+
+# Get categories
+curl http://localhost:3000/api/menu/categories
+
+# Search for coffee items
+curl "http://localhost:3000/api/menu/search?q=coffee"
+
+# Get items from Coffee category
+curl http://localhost:3000/api/menu/category/Coffee
 ```
 
 ### Integration with MCP Clients
@@ -294,6 +336,8 @@ menu-mcp/
 - `@modelcontextprotocol/sdk`: Official MCP SDK (latest)
 - `axios`: HTTP client for web requests (latest)
 - `cheerio`: Server-side HTML parsing and manipulation (latest)
+- `express`: Web framework for HTTP API (latest)
+- `cors`: CORS middleware for cross-origin requests (latest)
 
 **Development:**
 - `eslint`: Code linting
@@ -304,9 +348,12 @@ menu-mcp/
 ### Scripts
 
 ```bash
-npm start          # Start the MCP server
+npm start          # Start both MCP and HTTP servers
 npm run dev        # Start with auto-restart
 npm test           # Run all tests
+npm run test:unit  # Run unit tests only
+npm run test:integration # Run integration tests only
+npm run test:http  # Run HTTP server tests only
 npm run test:watch # Run tests in watch mode
 npm run lint       # Check code style
 npm run lint:fix   # Fix code style issues
