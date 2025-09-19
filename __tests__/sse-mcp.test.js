@@ -23,7 +23,7 @@ describe('SSE MCP Transport', () => {
 
     it('should advertise SSE endpoint in root response', async () => {
       const response = await request(app).get('/');
-      
+
       expect(response.status).toBe(200);
       expect(response.body).toHaveProperty('mcp');
       expect(response.body.mcp).toHaveProperty('sse');
@@ -32,7 +32,7 @@ describe('SSE MCP Transport', () => {
 
     it('should provide both stdio and SSE MCP options', async () => {
       const response = await request(app).get('/');
-      
+
       expect(response.body.mcp).toHaveProperty('stdio');
       expect(response.body.mcp).toHaveProperty('sse');
       expect(response.body.mcp.stdio).toContain('stdio');
@@ -44,17 +44,20 @@ describe('SSE MCP Transport', () => {
     it('should have SSE route that responds', async () => {
       // Test that the route exists and responds (without waiting for SSE stream)
       const agent = request(app).get('/sse');
-      
+
       // Set a very short timeout to test route existence without hanging
-      const response = await new Promise((resolve) => {
+      const response = await new Promise(resolve => {
         const req = agent.timeout(50);
-        
+
         req.end((err, res) => {
           // Either we get a response or a timeout - both indicate the route exists
           if (res) {
             resolve(res);
           } else if (err && err.timeout) {
-            resolve({ status: 'timeout', message: 'Route exists but connection timed out as expected' });
+            resolve({
+              status: 'timeout',
+              message: 'Route exists but connection timed out as expected',
+            });
           } else {
             resolve({ status: 'error', error: err });
           }
@@ -75,7 +78,7 @@ describe('SSE MCP Transport', () => {
       // Test that regular endpoints work
       const healthResponse = await request(app).get('/health');
       expect(healthResponse.status).toBe(200);
-      
+
       const apiResponse = await request(app).get('/api');
       expect(apiResponse.status).toBe(200);
     });
@@ -98,11 +101,11 @@ describe('SSE MCP Transport', () => {
 
     it('should support dual transport modes', async () => {
       const response = await request(app).get('/');
-      
+
       // Should advertise both transport methods
       expect(response.body.mcp.stdio).toBeDefined();
       expect(response.body.mcp.sse).toBeDefined();
-      
+
       // Both should be different
       expect(response.body.mcp.stdio).not.toBe(response.body.mcp.sse);
     });
