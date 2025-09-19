@@ -53,7 +53,7 @@ describe('HTTP Server', () => {
       expect(response.body).toHaveProperty('categories');
       expect(response.body).toHaveProperty('totalCategories');
       expect(Array.isArray(response.body.categories)).toBe(true);
-    }, 20000);
+    }, 120000);
 
     it('should search menu items with query parameter', async () => {
       const response = await request(app).get('/api/menu/search?q=coffee');
@@ -63,7 +63,7 @@ describe('HTTP Server', () => {
       expect(response.body).toHaveProperty('resultsFound');
       expect(response.body).toHaveProperty('items');
       expect(Array.isArray(response.body.items)).toBe(true);
-    }, 20000);
+    }, 120000);
 
     it('should return 400 for search without query', async () => {
       const response = await request(app).get('/api/menu/search');
@@ -83,17 +83,17 @@ describe('HTTP Server', () => {
       expect(response.body).toHaveProperty('lastUpdated');
       expect(Array.isArray(response.body.categories)).toBe(true);
       expect(Array.isArray(response.body.items)).toBe(true);
-    }, 20000);
+    }, 120000);
 
     it('should get items by category', async () => {
-      const response = await request(app).get('/api/menu/category/General');
+      const response = await request(app).get('/api/menu/category/COFFEE');
 
       expect(response.status).toBe(200);
-      expect(response.body).toHaveProperty('category', 'General');
+      expect(response.body).toHaveProperty('category', 'COFFEE');
       expect(response.body).toHaveProperty('itemCount');
       expect(response.body).toHaveProperty('items');
       expect(Array.isArray(response.body.items)).toBe(true);
-    }, 20000);
+    }, 120000);
   });
 
   describe('CORS Support', () => {

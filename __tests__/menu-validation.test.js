@@ -69,6 +69,23 @@ describe('Menu Data Validation', () => {
         // Category should be reasonable
         expect(typeof firstItem.category).toBe('string');
         expect(firstItem.category.length).toBeGreaterThan(0);
+
+        // Test ALL items have required fields
+        menuData.items.forEach((item, index) => {
+          expect(item).toHaveProperty('name', expect.any(String));
+          expect(item).toHaveProperty('price', expect.any(String));
+          expect(item).toHaveProperty('category', expect.any(String));
+
+          expect(item.name.length).toBeGreaterThan(0);
+          expect(item.category.length).toBeGreaterThan(0);
+
+          // Each item should have a valid price or "Price not available"
+          if (item.price !== 'Price not available') {
+            expect(item.price).toMatch(/\$\d+\.?\d*/);
+          }
+
+          console.log(`Item ${index + 1}: ${item.name} - ${item.price} (${item.category})`);
+        });
       }
     }, 30000);
 
@@ -100,31 +117,46 @@ describe('Menu Data Validation', () => {
   });
 
   describe('Menu Categories Quality', () => {
-    it('should return meaningful categories', async () => {
+    it('should return all expected categories from website', async () => {
       const result = await server.getMenuCategories();
       const categoriesData = JSON.parse(result.content[0].text);
 
       expect(categoriesData).toHaveProperty('categories');
       expect(Array.isArray(categoriesData.categories)).toBe(true);
-      expect(categoriesData.categories.length).toBeGreaterThan(0);
+      expect(categoriesData.categories.length).toBeGreaterThan(3);
 
-      // Categories should not be just "General"
-      const hasSpecificCategories = categoriesData.categories.some(
-        category =>
-          category.toLowerCase() !== 'general' &&
-          (category.toLowerCase().includes('coffee') ||
-            category.toLowerCase().includes('drink') ||
-            category.toLowerCase().includes('food') ||
-            category.toLowerCase().includes('pastry') ||
-            category.toLowerCase().includes('tea'))
+      // Should find the specific categories we know exist on the website
+      const expectedCategories = [
+        'BEVERAGES',
+        'COFFEE',
+        'PASTRIES',
+        'FOR FIVE COOKIES',
+        'GRAB N GO',
+      ];
+      const foundExpectedCategories = expectedCategories.filter(expected =>
+        categoriesData.categories.some(
+          actual =>
+            actual.toUpperCase().includes(expected) || expected.includes(actual.toUpperCase())
+        )
       );
 
-      if (categoriesData.categories.length === 1 && categoriesData.categories[0] === 'General') {
-        console.warn('Only "General" category found - menu parsing may need improvement');
-      } else {
-        expect(hasSpecificCategories).toBe(true);
-      }
-    }, 30000);
+      console.log('Expected categories found:', foundExpectedCategories);
+      console.log('All categories:', categoriesData.categories);
+
+      // Should find at least some of the expected categories
+      expect(foundExpectedCategories.length).toBeGreaterThan(2);
+
+      // Should include food categories (not just beverages)
+      const hasFoodCategories = categoriesData.categories.some(
+        category =>
+          category.toUpperCase().includes('COOKIES') ||
+          category.toUpperCase().includes('PASTRIES') ||
+          category.toUpperCase().includes('GRAB') ||
+          category.toUpperCase().includes('FOOD')
+      );
+
+      expect(hasFoodCategories).toBe(true);
+    }, 60000);
   });
 
   describe('Search Functionality', () => {

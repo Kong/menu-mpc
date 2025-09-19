@@ -8,6 +8,7 @@ import axios from 'axios';
 import * as cheerio from 'cheerio';
 import express from 'express';
 import cors from 'cors';
+import puppeteer from 'puppeteer';
 
 class ForFiveCoffeeServer {
   constructor() {
@@ -290,7 +291,14 @@ class ForFiveCoffeeServer {
         return menuData;
       }
 
-      // Fallback to web scraping if API fails
+      // Try headless browser scraping for dynamic content
+      menuData = await this.fetchWithPuppeteer();
+      if (menuData && menuData.items.length > 0) {
+        this.updateCache(menuData);
+        return menuData;
+      }
+
+      // Fallback to static web scraping if Puppeteer fails
       menuData = await this.fetchFromWebsite();
       this.updateCache(menuData);
       return menuData;
@@ -331,7 +339,7 @@ class ForFiveCoffeeServer {
   clearCache() {
     this.menuCache = null;
     this.cacheTimestamp = null;
-    console.log('Menu cache cleared');
+    console.log('Menu cache cleared - next request will fetch fresh data');
   }
 
   async fetchFromAPI() {
@@ -425,6 +433,223 @@ class ForFiveCoffeeServer {
     }
 
     return items;
+  }
+
+  async fetchWithPuppeteer() {
+    let browser;
+    try {
+      console.log('Starting headless browser...');
+      browser = await puppeteer.launch({
+        headless: true,
+        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        timeout: 30000,
+      });
+
+      const page = await browser.newPage();
+      await page.setUserAgent(
+        'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36'
+      );
+
+      console.log('Loading For Five Coffee menu page...');
+      await page.goto('https://for-five-coffee.ordrsliponline.com/menus', {
+        waitUntil: 'networkidle2',
+        timeout: 30000,
+      });
+
+      // Wait for React to render the menu content
+      console.log('Waiting for menu content to load...');
+      await new Promise(resolve => setTimeout(resolve, 3000));
+
+      // Try to wait for menu sections to appear
+      try {
+        await page.waitForSelector(
+          '[data-testid*="menu"], .menu-section, .category, .menu-category',
+          { timeout: 10000 }
+        );
+      } catch {
+        console.log('Menu selectors not found, proceeding with content extraction...');
+      }
+
+      // First, get the available categories
+      const categories = await page.evaluate(() => {
+        /* eslint-disable no-undef */
+        const categoryElements = document.querySelectorAll('.cat-items');
+        return Array.from(categoryElements).map(el => el.textContent.trim());
+      });
+
+      console.log('Found categories:', categories);
+
+      const allItems = [];
+
+      // Click on each category and extract items
+      for (const category of categories) {
+        try {
+          console.log(`Extracting items from category: ${category}`);
+
+          // Click on the category and wait for content
+          const clicked = await page.evaluate(categoryName => {
+            /* eslint-disable no-undef */
+            const categoryElements = document.querySelectorAll('.cat-items');
+            for (const el of categoryElements) {
+              if (el.textContent.trim() === categoryName) {
+                console.log(`Clicking on category: ${categoryName}`);
+                el.click();
+                return true;
+              }
+            }
+            return false;
+          }, category);
+
+          if (!clicked) {
+            console.log(`Could not click on category: ${category}`);
+            continue;
+          }
+
+          // Wait longer for items to load and DOM to update
+          await new Promise(resolve => setTimeout(resolve, 3000));
+
+          // Extract items from this category
+          const categoryItems = await page.evaluate(categoryName => {
+            /* eslint-disable no-undef */
+            const items = [];
+
+            // Look for menu items that match the structure from the screenshot
+            // Items appear to be in card/grid layout with name, optional description, and price
+            const allDivs = document.querySelectorAll('div');
+            const menuItemCandidates = [];
+
+            allDivs.forEach(div => {
+              const text = div.textContent?.trim() || '';
+
+              // Look for divs that contain a price and reasonable amount of text
+              if (
+                text.includes('$') &&
+                text.length > 5 &&
+                text.length < 300 &&
+                !div.classList.contains('cat-items') &&
+                !div.classList.contains('navbar') &&
+                !text.includes('$0.00')
+              ) {
+                // Check for price patterns - allow price ranges like $5.75 - $7.75
+                const priceMatches = text.match(/\$\d+\.\d{2}/g);
+                if (priceMatches && priceMatches.length >= 1) {
+                  // Use first price if multiple (for ranges like $5.75 - $7.75)
+                  menuItemCandidates.push({
+                    element: div,
+                    text: text,
+                    price: priceMatches[0],
+                    priceRange:
+                      priceMatches.length > 1
+                        ? `${priceMatches[0]} - ${priceMatches[priceMatches.length - 1]}`
+                        : priceMatches[0],
+                  });
+                }
+              }
+            });
+
+            console.log(
+              `Found ${menuItemCandidates.length} menu item candidates for ${categoryName}`
+            );
+
+            // Debug: show what we found
+            menuItemCandidates.slice(0, 3).forEach((candidate, i) => {
+              console.log(
+                `Candidate ${i + 1}: ${candidate.text.substring(0, 80)}... (${candidate.price})`
+              );
+            });
+
+            // Extract items from candidates
+            menuItemCandidates.forEach((candidate, _index) => {
+              const text = candidate.text;
+              const price = candidate.priceRange; // Use full price range for items with multiple sizes
+
+              // Clean the text and extract name/description
+              const cleanText = text.replace(/\$\d+\.\d{2}(\s*-\s*\$\d+\.\d{2})?/g, '').trim(); // Remove price ranges
+              const lines = cleanText
+                .split('\n')
+                .map(l => l.trim())
+                .filter(l => l.length > 0 && l.length < 100);
+
+              if (lines.length > 0) {
+                // First non-empty line should be the item name
+                let name = lines[0];
+
+                // Clean up common prefixes/suffixes
+                name = name.replace(/^(Add to cart|Remove|Quantity:?\s*\d*)/, '').trim();
+
+                if (name.length > 2 && name.length < 80) {
+                  const description = lines.slice(1).join(' ').substring(0, 200);
+
+                  console.log(`Extracted: "${name}" - ${price} from: ${text.substring(0, 60)}...`);
+
+                  items.push({
+                    name: name,
+                    description: description,
+                    price: price,
+                    category: categoryName,
+                  });
+                }
+              }
+            });
+
+            return items;
+          }, category);
+
+          console.log(`Found ${categoryItems.length} items in ${category}`);
+          allItems.push(...categoryItems);
+        } catch (error) {
+          console.log(`Error extracting from category ${category}:`, error.message);
+        }
+      }
+
+      // Remove duplicates based on name only (since same item can have different sizes/prices)
+      const uniqueItems = [];
+      const seen = new Set();
+
+      allItems.forEach(item => {
+        const key = `${item.name}-${item.category}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          uniqueItems.push(item);
+        }
+      });
+
+      const menuData = {
+        items: uniqueItems,
+        categories: categories,
+        totalCategories: categories.length,
+      };
+
+      console.log(
+        `Puppeteer found ${menuData.items.length} unique items in ${menuData.categories.length} categories`
+      );
+      console.log('Categories found:', menuData.categories);
+
+      if (uniqueItems.length > 0) {
+        console.log('Sample items found:');
+        uniqueItems.slice(0, 5).forEach((item, i) => {
+          console.log(`  ${i + 1}. ${item.name} - ${item.price} (${item.category})`);
+        });
+      }
+
+      if (menuData.items.length > 0) {
+        return {
+          items: menuData.items,
+          categories: menuData.categories,
+          lastUpdated: new Date().toISOString(),
+          source: 'puppeteer',
+        };
+      }
+
+      return null;
+    } catch (error) {
+      console.error('Puppeteer scraping failed:', error.message);
+      return null;
+    } finally {
+      if (browser) {
+        await browser.close();
+      }
+    }
   }
 
   async fetchFromWebsite() {
@@ -526,16 +751,18 @@ class ForFiveCoffeeServer {
       menuSections.forEach(item => categories.add(item.category));
     }
 
-    // If still no items found, use fallback menu
+    // If still no items found or JavaScript code detected, fail
     if (menuItems.length === 0 || this.isJavaScriptCode(menuItems)) {
-      console.log('No valid menu items found, using fallback menu');
-      return this.createFallbackMenu();
+      throw new Error(
+        'Unable to extract valid menu items from website - only found JavaScript configuration data'
+      );
     }
 
     return {
       items: menuItems,
       categories: Array.from(categories),
       lastUpdated: new Date().toISOString(),
+      source: 'static_html',
     };
   }
 
@@ -551,148 +778,6 @@ class ForFiveCoffeeServer {
         item.name.includes('coordinates') ||
         item.name.length > 500
     );
-  }
-
-  createFallbackMenu() {
-    // Based on web search results and typical coffee shop offerings
-    const menuItems = [
-      // Espresso Drinks
-      {
-        name: 'Espresso',
-        description:
-          'A classic, concentrated coffee brewed by forcing a small amount of nearly boiling water through finely-ground coffee beans',
-        price: '$3.00',
-        category: 'Espresso Drinks',
-      },
-      {
-        name: 'Macchiato',
-        description: 'An espresso "stained" with a small amount of steamed milk or foam',
-        price: '$3.50',
-        category: 'Espresso Drinks',
-      },
-      {
-        name: 'Americano',
-        description:
-          'Espresso diluted with hot water, resulting in a coffee similar in strength to drip coffee',
-        price: '$3.75',
-        category: 'Espresso Drinks',
-      },
-      {
-        name: 'Cortado',
-        description:
-          'Equal parts espresso and steamed milk, offering a balanced coffee-to-milk ratio',
-        price: '$4.25',
-        category: 'Espresso Drinks',
-      },
-      {
-        name: 'Red Eye',
-        description:
-          'Drip coffee or cold brew with a double shot of espresso, providing an extra caffeine boost',
-        price: '$4.50',
-        category: 'Espresso Drinks',
-      },
-
-      // Milk-Based Drinks
-      {
-        name: 'Flat White',
-        description:
-          'A coffee beverage consisting of espresso with a higher proportion of steamed milk',
-        price: '$4.75',
-        category: 'Milk-Based Drinks',
-      },
-      {
-        name: 'Cappuccino',
-        description:
-          'Espresso topped with equal parts steamed milk and milk foam, creating a rich and frothy drink',
-        price: '$4.50',
-        category: 'Milk-Based Drinks',
-      },
-      {
-        name: 'Latte',
-        description: 'Espresso with a larger amount of steamed milk and a small layer of foam',
-        price: '$5.00',
-        category: 'Milk-Based Drinks',
-      },
-      {
-        name: 'Café Au Lait',
-        description:
-          'Drip coffee mixed with steamed milk, offering a balanced coffee and milk flavor',
-        price: '$4.25',
-        category: 'Milk-Based Drinks',
-      },
-
-      // Cold Drinks
-      {
-        name: 'Cold Brew',
-        description:
-          'Coffee brewed with cold water over an extended period, resulting in a smooth and less acidic beverage',
-        price: '$4.00',
-        category: 'Cold Drinks',
-      },
-      {
-        name: 'Raspberry Cold Brew',
-        description: 'A flavored cold brew coffee with raspberry notes',
-        price: '$4.50',
-        category: 'Cold Drinks',
-      },
-      {
-        name: 'Freddo Espresso',
-        description:
-          'A Greek-style iced espresso, where the espresso is shaken with ice to create a frothy, chilled drink',
-        price: '$4.25',
-        category: 'Cold Drinks',
-      },
-      {
-        name: 'Freddo Cappuccino',
-        description: 'Similar to the Freddo Espresso but topped with a layer of cold frothed milk',
-        price: '$4.75',
-        category: 'Cold Drinks',
-      },
-
-      // Brewed Coffee
-      {
-        name: 'Drip Coffee',
-        description: 'Traditional brewed coffee made by pouring hot water over ground coffee beans',
-        price: '$2.50',
-        category: 'Brewed Coffee',
-      },
-      {
-        name: 'Pour Over Coffee',
-        description:
-          'Manually brewed coffee made to order, allowing for precise control over brewing variables',
-        price: '$4.00',
-        category: 'Brewed Coffee',
-      },
-
-      // Alternative Drinks
-      {
-        name: 'Matcha Latte',
-        description:
-          'A blend of matcha green tea powder and steamed milk, offering a unique, earthy flavor',
-        price: '$5.25',
-        category: 'Tea & Alternative',
-      },
-      {
-        name: 'Chai Latte',
-        description:
-          'A spiced tea concentrate mixed with steamed milk, providing a sweet and spicy flavor profile',
-        price: '$4.75',
-        category: 'Tea & Alternative',
-      },
-      {
-        name: 'Gotham Hot Chocolate',
-        description: 'A rich and creamy hot chocolate beverage',
-        price: '$4.50',
-        category: 'Tea & Alternative',
-      },
-    ];
-
-    return {
-      items: menuItems,
-      categories: [...new Set(menuItems.map(item => item.category))],
-      lastUpdated: new Date().toISOString(),
-      source: 'fallback_menu',
-    };
   }
 
   extractText($elem, selectors) {
