@@ -51,6 +51,14 @@ jobs:
     - name: Run HTTP server tests
       run: npm run test:http
       
+    - name: Run SSE MCP transport tests
+      run: npm run test:sse
+      
+    - name: Run menu validation tests
+      run: npm run test:menu
+      env:
+        NODE_TLS_REJECT_UNAUTHORIZED: 0
+      
     - name: Run integration tests
       run: npm run test:integration --verbose
       env:
