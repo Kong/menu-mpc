@@ -2,7 +2,7 @@
   "mcpServers": {
     "for-five-coffee": {
       "command": "node",
-      "args": ["/Users/marco/git/menu-mcp/server.js"],
+      "args": ["/path/to/for-five-mcp/server.js"],
       "env": {
         "NODE_ENV": "production",
         "PORT": "3000"

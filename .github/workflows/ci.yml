@@ -2,9 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ main ]
   pull_request:
-    branches: [ main, develop ]
 
 jobs:
   test:
@@ -51,8 +50,8 @@ jobs:
     - name: Run HTTP server tests
       run: npm run test:http
       
-    - name: Run SSE MCP transport tests
-      run: npm run test:sse
+    - name: Run MCP transport tests
+      run: npm run test:mcp
       
     - name: Run menu validation tests
       run: npm run test:menu

@@ -1,9 +1,17 @@
 {
-  "name": "for-five-coffee-mcp-server",
+  "name": "for-five-mcp",
   "version": "1.0.0",
   "description": "MCP server that exposes For Five Coffee menu items",
   "main": "server.js",
   "type": "module",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Kong/for-five-mcp.git"
+  },
+  "homepage": "https://github.com/Kong/for-five-mcp",
+  "bugs": {
+    "url": "https://github.com/Kong/for-five-mcp/issues"
+  },
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
@@ -12,7 +20,7 @@
     "test:unit": "NODE_OPTIONS='--experimental-vm-modules' jest --testPathPatterns='server.test.js'",
     "test:integration": "NODE_OPTIONS='--experimental-vm-modules' jest --testPathPatterns='integration.test.js'",
     "test:http": "NODE_OPTIONS='--experimental-vm-modules' jest --testPathPatterns='http-server.test.js'",
-    "test:sse": "NODE_OPTIONS='--experimental-vm-modules' jest --testPathPatterns='sse-mcp.test.js'",
+    "test:mcp": "NODE_OPTIONS='--experimental-vm-modules' jest --testPathPatterns='mcp-transport.test.js'",
     "test:menu": "NODE_OPTIONS='--experimental-vm-modules' jest --testPathPatterns='menu-validation.test.js'",
     "test:cache": "NODE_OPTIONS='--experimental-vm-modules' jest --testPathPatterns='cache.test.js'",
     "test:puppeteer": "NODE_OPTIONS='--experimental-vm-modules' jest --testPathPatterns='puppeteer-scraping.test.js'",

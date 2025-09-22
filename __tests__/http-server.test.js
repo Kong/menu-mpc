@@ -32,7 +32,10 @@ describe('HTTP Server', () => {
       expect(response.body).toHaveProperty('message', 'For Five Coffee MCP Server');
       expect(response.body).toHaveProperty('version', '1.0.0');
       expect(response.body).toHaveProperty('mcp');
-      expect(response.body).toHaveProperty('http');
+      expect(response.body).toHaveProperty('api');
+      expect(response.body).toHaveProperty('health');
+      expect(response.body.mcp).toHaveProperty('http');
+      expect(response.body.mcp).toHaveProperty('stdio');
     });
 
     it('should respond to API documentation endpoint', async () => {

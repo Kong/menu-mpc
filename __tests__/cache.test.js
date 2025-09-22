@@ -66,7 +66,7 @@ describe('Menu Caching', () => {
     }, 180000);
 
     it('should have configurable cache expiry', () => {
-      expect(server.cacheExpiryMinutes).toBe(30); // Default 30 minutes
+      expect(server.cacheExpiryMinutes).toBe(1440); // Default 24 hours (1440 minutes)
 
       // Should be able to change expiry
       server.cacheExpiryMinutes = 60;
