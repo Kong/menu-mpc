@@ -1,4 +1,4 @@
-[![CI](https://github.com/Kong/menu-mpc/actions/workflows/ci.yml/badge.svg)](https://github.com/Kong/menu-mpc/actions/workflows/ci.yml)
+[![CI](https://github.com/Kong/for-five-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/Kong/for-five-mcp/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen.svg)](https://nodejs.org/)
 
@@ -9,8 +9,8 @@ A Model Context Protocol (MCP) server that provides access to [For Five Coffee](
 ## Quick Start
 
 ```bash
-git clone <this-repo>
-cd menu-mcp
+git clone https://github.com/Kong/for-five-mcp.git
+cd for-five-mcp
 npm install
 npm start
 ```
@@ -30,7 +30,7 @@ Add to `claude_desktop_config.json`:
   "mcpServers": {
     "for-five-coffee": {
       "command": "node",
-      "args": ["/path/to/menu-mcp/server.js"]
+      "args": ["/path/to/for-five-mcp/server.js"]
     }
   }
 }
@@ -46,7 +46,7 @@ Add to `~/.cursor/mcp.json`:
   "mcpServers": {
     "for-five-coffee": {
       "command": "node",
-      "args": ["/Users/marco/git/menu-mcp/server.js"],
+      "args": ["/path/to/for-five-mcp/server.js"],
       "env": {
         "PORT": "3000"
       }
@@ -62,13 +62,14 @@ If you're running `npm start` separately, add this to `~/.cursor/mcp.json`:
 {
   "mcpServers": {
     "for-five-coffee": {
-      "url": "http://localhost:3000/sse"
+      "url": "http://localhost:3000/mcp",
+      "transport": "http"
     }
   }
 }
 ```
 
-This connects Cursor to the running MCP server via Server-Sent Events (SSE).
+This connects Cursor to the running MCP server via HTTP JSON-RPC 2.0 transport.
 
 ## Usage Examples
 
@@ -125,6 +126,7 @@ results = requests.get('http://localhost:3000/api/menu/search',
 | `GET /api/menu/search?q={query}` | Search items |
 | `GET /api/menu/categories` | All categories |
 | `GET /api/menu/category/{name}` | Items by category |
+| `POST /mcp` | MCP JSON-RPC 2.0 endpoint |
 
 ## MCP Tools
 
@@ -140,7 +142,7 @@ npm run dev          # Start with auto-restart
 npm test             # Run all tests
 npm run test:unit    # Unit tests only
 npm run test:http    # HTTP API tests only  
-npm run test:sse     # SSE MCP transport tests only
+npm run test:mcp     # MCP transport tests only
 npm run test:integration # Integration tests only
 npm run lint         # Check code style
 ```

@@ -2,7 +2,6 @@
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { CallToolRequestSchema, ListToolsRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import axios from 'axios';
 import * as cheerio from 'cheerio';
@@ -231,6 +230,7 @@ class ForFiveCoffeeServer {
           'GET /api/menu/category/{category}': 'Get items by category',
           'GET /api/cache/status': 'Get cache status',
           'POST /api/cache/clear': 'Clear menu cache',
+          'POST /mcp': 'MCP JSON-RPC 2.0 endpoint',
         },
         examples: {
           fullMenu: `${req.protocol}://${req.get('host')}/api/menu`,
@@ -242,16 +242,128 @@ class ForFiveCoffeeServer {
       });
     });
 
-    // MCP SSE endpoint
-    this.app.get('/sse', async (req, res) => {
+    // MCP HTTP endpoint - JSON-RPC 2.0 over HTTP
+    this.app.post('/mcp', express.json(), async (req, res) => {
       try {
-        const transport = new SSEServerTransport('/sse', res);
-        await this.server.connect(transport);
-      } catch (error) {
-        console.error('SSE connection error:', error);
-        if (!res.headersSent) {
-          res.status(500).json({ error: 'SSE connection failed' });
+        // Handle MCP JSON-RPC requests over HTTP
+        const { method, params, id } = req.body;
+
+        if (method === 'initialize') {
+          // MCP initialization handshake
+          res.json({
+            jsonrpc: '2.0',
+            result: {
+              protocolVersion: '2024-11-05',
+              capabilities: {
+                tools: {},
+                resources: {},
+                prompts: {},
+                logging: {},
+              },
+              serverInfo: {
+                name: 'for-five-coffee-mcp-server',
+                version: '1.0.0',
+              },
+            },
+            id,
+          });
+        } else if (method === 'tools/list') {
+          const tools = [
+            {
+              name: 'get_full_menu',
+              description:
+                'Fetch the complete menu from For Five Coffee including all categories and items',
+              inputSchema: { type: 'object', properties: {} },
+            },
+            {
+              name: 'search_menu_items',
+              description: 'Search for specific menu items by name or category',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  query: { type: 'string', description: 'Search term to find in menu items' },
+                },
+                required: ['query'],
+              },
+            },
+            {
+              name: 'get_menu_categories',
+              description: 'Get all available menu categories',
+              inputSchema: { type: 'object', properties: {} },
+            },
+            {
+              name: 'get_items_by_category',
+              description: 'Get all menu items from a specific category',
+              inputSchema: {
+                type: 'object',
+                properties: {
+                  category: { type: 'string', description: 'The category name to filter by' },
+                },
+                required: ['category'],
+              },
+            },
+            {
+              name: 'clear_menu_cache',
+              description: 'Clear the menu cache to force fresh data on next request',
+              inputSchema: { type: 'object', properties: {} },
+            },
+          ];
+
+          res.json({ jsonrpc: '2.0', result: { tools }, id });
+        } else if (method === 'tools/call') {
+          const { name, arguments: args } = params;
+          let result;
+
+          switch (name) {
+            case 'get_full_menu':
+              result = await this.getFullMenu();
+              break;
+            case 'search_menu_items':
+              result = await this.searchMenuItems(args.query);
+              break;
+            case 'get_menu_categories':
+              result = await this.getMenuCategories();
+              break;
+            case 'get_items_by_category':
+              result = await this.getItemsByCategory(args.category);
+              break;
+            case 'clear_menu_cache':
+              result = await this.clearMenuCache();
+              break;
+            default:
+              throw new Error(`Unknown tool: ${name}`);
+          }
+
+          res.json({ jsonrpc: '2.0', result, id });
+        } else if (method === 'resources/list') {
+          // No resources implemented
+          res.json({ jsonrpc: '2.0', result: { resources: [] }, id });
+        } else if (method === 'prompts/list') {
+          // No prompts implemented
+          res.json({ jsonrpc: '2.0', result: { prompts: [] }, id });
+        } else if (method === 'ping') {
+          // Ping/pong for connection health
+          res.json({ jsonrpc: '2.0', result: {}, id });
+        } else if (method === 'notifications/initialized') {
+          // Client notification that initialization is complete
+          // For notifications, we should return a 200 with empty result regardless of id
+          res.json({ jsonrpc: '2.0', result: {}, id });
+        } else if (method === 'logging/setLevel') {
+          // Set logging level (we'll accept but ignore for now)
+          res.json({ jsonrpc: '2.0', result: {}, id });
+        } else {
+          res.status(400).json({
+            jsonrpc: '2.0',
+            error: { code: -32601, message: 'Method not found' },
+            id,
+          });
         }
+      } catch (error) {
+        res.status(500).json({
+          jsonrpc: '2.0',
+          error: { code: -32603, message: error.message },
+          id: req.body.id,
+        });
       }
     });
 
@@ -262,9 +374,9 @@ class ForFiveCoffeeServer {
         version: '1.0.0',
         mcp: {
           stdio: 'Model Context Protocol server running on stdio',
-          sse: `MCP over SSE available at ${req.protocol}://${req.get('host')}/sse`,
+          http: `MCP over HTTP (JSON-RPC 2.0) available at ${req.protocol}://${req.get('host')}/mcp`,
         },
-        http: `HTTP API available at ${req.protocol}://${req.get('host')}/api`,
+        api: `REST API available at ${req.protocol}://${req.get('host')}/api`,
         health: `${req.protocol}://${req.get('host')}/health`,
       });
     });
@@ -612,7 +724,24 @@ class ForFiveCoffeeServer {
                 let name = lines[0];
                 name = name.replace(/^(Add to cart|Remove|Quantity:?\s*\d*)/, '').trim();
 
-                if (name.length > 2 && name.length < 80) {
+                // Filter out navigation and UI elements
+                const isNavigationText =
+                  name.includes('Boston') ||
+                  name.includes('Change Locations') ||
+                  name.includes('Pickup Details') ||
+                  name.includes('State Street') ||
+                  name.includes('Search') ||
+                  name.includes('200 State') ||
+                  name.includes('Edit') ||
+                  name.includes('ASAP') ||
+                  name.startsWith(categoryName) ||
+                  name.includes(categoryName + 'Search') ||
+                  name.includes('  ') || // Multiple spaces indicate combined text
+                  name.split(' ').length > 5 || // Too many words likely UI text
+                  name.length < 3 ||
+                  name.length > 50;
+
+                if (!isNavigationText && name.length > 2 && name.length < 80) {
                   const description = lines.slice(1).join(' ').substring(0, 200);
 
                   items.push({
@@ -876,6 +1005,8 @@ class ForFiveCoffeeServer {
               categories: menuData.categories,
               items: menuData.items,
               lastUpdated: menuData.lastUpdated,
+              cached: menuData.cached || false,
+              source: menuData.source || 'puppeteer',
             },
             null,
             2
